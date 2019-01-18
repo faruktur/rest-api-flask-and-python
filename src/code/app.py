@@ -1,5 +1,5 @@
 from flask import Flask,jsonify,request
-from flask_restful import Api,Resource
+from flask_restful import Api,Resource,reqparse
 from flask_jwt import JWT,jwt_required
 
 from security import authenticate,identity
@@ -17,6 +17,10 @@ jwt = JWT(app,authenticate,identity) # /auth
 items=[]
 
 class Item(Resource):
+    parser= reqparse.RequestParser()
+    parser.add_argument('price',type=float,required=true,
+    help="This field is required"
+    )
     
     @jwt_required()
     def get(self,name):
@@ -27,10 +31,28 @@ class Item(Resource):
     def post(self,name):
         if next(filter(lambda c: c['name']==name,items),None):
             return {'message':"An item with name '{}' already eist".format(name)},400
-        data = request.get_json()
+        data = Item.parser.parse_args()
         item:{'name':name,'price':data['price']}
         items.append(item)
         return item,201
+    
+    @jwt_required()
+    def delete(self,name):
+        global items
+        item = list(filter(lambda c:c['name']!=name,items))
+        items.remove(item)
+        return {'message':'item deleted'}
+    
+    @jwt_required()
+    def put(self,name):
+        data = Item.parser.parse_args()
+        item = next(filter(lambda c:c['name']==name,items),None)
+        if item is None:
+            item = {'name':name,'price':data['price']}
+            items.append(item)
+        else:
+            items.update(data)
+        return item
 
 class Items(Resource):
     @jwt_required()
